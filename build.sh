@@ -27,13 +27,13 @@ echo "    Kernel version: $KERNEL_VERSION"
 echo ">>> [3/6] Downloading CachyOS patches..."
 mkdir -p patches
 
-curl -fsSL "$PATCH_BASE/all/0001-cachyos-base-all.patch" \
+curl -fsSL https://raw.githubusercontent.com/CachyOS/kernel-patches/refs/heads/master/6.19/all/0001-cachyos-base-all.patch \
   -o patches/0001-cachyos-base-all.patch
 
-curl -fsSL "$PATCH_BASE/misc/0001-clang-polly.patch" \
+curl -fsSL https://raw.githubusercontent.com/CachyOS/kernel-patches/refs/heads/master/6.19/misc/0001-clang-polly.patch \
   -o patches/0002-clang-polly.patch
 
-curl -fsSL "$PATCH_BASE/sched/0001-bore-cachy.patch" \
+curl -fsSL https://raw.githubusercontent.com/CachyOS/kernel-patches/refs/heads/master/6.19/sched/0001-bore-cachy.patch \
   -o patches/0003-bore-cachy.patch
 
 # ── 4. Apply patches ──────────────────────────────────────────────────────────
@@ -70,7 +70,7 @@ make -C kernel \
   LLVM=1 \
   LLVM_IAS=1 \
   LD=ld.lld \
-  KCFLAGS="-O2 -mllvm -polly" \
+  KCFLAGS="-O3 -mllvm -polly" \
   -j"$(nproc)" \
   bzImage modules
 
