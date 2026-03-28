@@ -17,7 +17,7 @@ sudo apt-get install -y --no-install-recommends \
 
 # ── 2. Clone kernel source ────────────────────────────────────────────────────
 echo ">>> [2/6] Cloning WSL2 kernel source..."
-git clone -b "wsl-6.19-rolling" --single-branch --depth=1 https://github.com/CachyOS/kernel-patches.git kernel
+git clone -b "wsl-6.19-rolling" --single-branch --depth=1 https://github.com/Nevuly/WSL2-Linux-Kernel-Rolling.git kernel
 
 KERNEL_VERSION=$(make -C kernel kernelversion 2>/dev/null)
 echo "$KERNEL_VERSION" > kernel-version.txt
