@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # ── Config (overridable via env) ──────────────────────────────────────────────
-KERNEL_REPO="${KERNEL_REPO:-https://github.com/Nevuly/WSL2-Linux-Kernel-Rolling}"
-PATCH_BASE="${PATCH_BASE:-https://raw.githubusercontent.com/CachyOS/kernel-patches/master/6.19}"
+KERNEL_REPO="https://github.com/Nevuly/WSL2-Linux-Kernel-Rolling.git"
+PATCH_BASE="https://github.com/CachyOS/kernel-patches.git"
 OUTDIR="release-artefacts"
 
 # ── 1. Install dependencies ───────────────────────────────────────────────────
