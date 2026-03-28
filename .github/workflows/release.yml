@@ -1,0 +1,175 @@
+name: Build & Release WSL2 CachyOS Kernel
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag (e.g. v6.19-cachy-1)"
+        required: true
+        default: "v6.19-cachy-1"
+  schedule:
+    # Run weekly on Mondays at 03:00 UTC to pick up upstream changes
+    - cron: "0 3 * * 1"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Ubuntu latest ships with an older kernel; use a large runner if kernel
+    # compilation times out on the free tier (kernel builds take ~60-90 min).
+    timeout-minutes: 180
+
+    steps:
+      # ── 1. Checkout this repo (needed for Actions context / release step) ──
+      - name: Checkout actions repo
+        uses: actions/checkout@v4
+
+      # ── 2. Install build dependencies ─────────────────────────────────────
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential bc bison flex libssl-dev libelf-dev \
+            libncurses-dev pahole dwarves python3 python3-pip \
+            clang lld llvm polly \
+            cpio curl git wget zip
+
+      # ── 3. Clone the WSL2 kernel source ───────────────────────────────────
+      - name: Clone WSL2-Linux-Kernel-Rolling
+        run: |
+          git clone --depth=1 \
+            https://github.com/Nevuly/WSL2-Linux-Kernel-Rolling \
+            kernel
+          echo "KERNEL_VERSION=$(make -C kernel kernelversion 2>/dev/null)" \
+            >> "$GITHUB_ENV"
+
+      # ── 4. Fetch CachyOS patches ───────────────────────────────────────────
+      - name: Download CachyOS patches
+        run: |
+          mkdir -p patches
+          BASE="https://raw.githubusercontent.com/CachyOS/kernel-patches/master/6.19"
+
+          curl -fsSL "$BASE/all/0001-cachyos-base-all.patch" \
+            -o patches/0001-cachyos-base-all.patch
+
+          curl -fsSL "$BASE/misc/0001-clang-polly.patch" \
+            -o patches/0002-clang-polly.patch
+
+          curl -fsSL "$BASE/sched/0001-bore-cachy.patch" \
+            -o patches/0003-bore-cachy.patch
+
+      # ── 5. Apply patches ──────────────────────────────────────────────────
+      - name: Apply CachyOS patches
+        working-directory: kernel
+        run: |
+          for patch in ../patches/*.patch; do
+            echo ">>> Applying $patch"
+            git apply --verbose "$patch"
+          done
+
+      # ── 6. Configure kernel ───────────────────────────────────────────────
+      - name: Configure kernel
+        working-directory: kernel
+        run: |
+          # Start from the upstream WSL2 Microsoft config if present,
+          # otherwise fall back to a minimal defconfig.
+          if [ -f Microsoft/config-wsl ]; then
+            cp Microsoft/config-wsl .config
+          else
+            make LLVM=1 defconfig
+          fi
+
+          # Enable BORE scheduler and Polly optimisations
+          scripts/config --enable  CONFIG_SCHED_BORE        || true
+          scripts/config --enable  CONFIG_POLLY             || true
+          scripts/config --disable CONFIG_DEBUG_INFO        || true
+          scripts/config --set-str CONFIG_LOCALVERSION "-cachy-wsl2"
+
+          # Resolve any new symbols introduced by the patches non-interactively
+          make LLVM=1 olddefconfig
+
+      # ── 7. Build ──────────────────────────────────────────────────────────
+      - name: Build kernel (Clang + LLD + Polly)
+        working-directory: kernel
+        run: |
+          make LLVM=1 \
+               LLVM_IAS=1 \
+               LD=ld.lld \
+               KCFLAGS="-O2 -mllvm -polly" \
+               -j"$(nproc)" \
+               bzImage modules
+
+      # ── 8. Package artefacts ──────────────────────────────────────────────
+      - name: Package build artefacts
+        working-directory: kernel
+        run: |
+          OUTDIR="../release-artefacts"
+          mkdir -p "$OUTDIR"
+
+          # Compressed kernel image
+          cp arch/x86/boot/bzImage "$OUTDIR/bzImage"
+
+          # Install modules into a staging dir and archive them
+          make LLVM=1 INSTALL_MOD_PATH="$OUTDIR/modules-staging" \
+               modules_install
+          tar -C "$OUTDIR/modules-staging" \
+              -czf "$OUTDIR/kernel-modules.tar.gz" .
+
+          # Convenience .wslconfig snippet so users know what file to drop in
+          cat > "$OUTDIR/README.md" <<'EOF'
+          ## Installation
+
+          1. Copy `bzImage` to a permanent path, e.g. `C:\bzImage`.
+          2. Add (or update) `%USERPROFILE%\.wslconfig`:
+
+          ```ini
+          [wsl2]
+          kernel=C:\\bzImage
+          ```
+
+          3. Restart WSL2: `wsl --shutdown && wsl`
+          EOF
+
+      # ── 9. Determine release tag ──────────────────────────────────────────
+      - name: Resolve release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=v${{ env.KERNEL_VERSION }}-cachy-$(date +'%Y%m%d')" \
+              >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── 10. Create GitHub Release ─────────────────────────────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "WSL2 CachyOS Kernel ${{ steps.tag.outputs.tag }}"
+          body: |
+            ## WSL2 Kernel — CachyOS patchset
+
+            **Base source:** [Nevuly/WSL2-Linux-Kernel-Rolling](https://github.com/Nevuly/WSL2-Linux-Kernel-Rolling)
+
+            ### Patches applied
+            | Patch | Source |
+            |-------|--------|
+            | cachyos-base-all | CachyOS/kernel-patches · 6.19/all |
+            | clang-polly      | CachyOS/kernel-patches · 6.19/misc |
+            | bore-cachy       | CachyOS/kernel-patches · 6.19/sched |
+
+            ### Build flags
+            `LLVM=1 LLVM_IAS=1 LD=ld.lld KCFLAGS="-O2 -mllvm -polly"`
+
+            See `README.md` inside the release for installation instructions.
+          files: |
+            release-artefacts/bzImage
+            release-artefacts/kernel-modules.tar.gz
+            release-artefacts/README.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
