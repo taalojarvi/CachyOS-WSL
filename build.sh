@@ -12,7 +12,7 @@ sudo apt-get update -qq
 sudo apt-get install -y --no-install-recommends \
   build-essential bc bison flex libssl-dev libelf-dev \
   libncurses-dev pahole dwarves python3 \
-  clang lld llvm polly \
+  clang lld llvm \
   cpio curl git wget zip
 
 # ── 2. Clone kernel source ────────────────────────────────────────────────────
