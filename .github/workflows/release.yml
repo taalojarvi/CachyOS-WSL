@@ -24,6 +24,10 @@ jobs:
 
       - name: Make build script executable
         run: chmod +x ./build.sh
+      - name: Configure Git
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
 
       - name: Run build script
         run: ./build.sh
