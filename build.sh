@@ -40,7 +40,7 @@ curl -fsSL https://raw.githubusercontent.com/CachyOS/kernel-patches/refs/heads/m
 echo ">>> [4/6] Applying patches..."
 for patch in patches/*.patch; do
   echo "    Applying: $patch"
-  git -C kernel am --3way "../$patch"
+  git -C kernel am "../$patch"
 done
 
 # ── 5. Configure kernel ───────────────────────────────────────────────────────
