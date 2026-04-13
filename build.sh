@@ -17,7 +17,7 @@ sudo apt-get install -y --no-install-recommends \
 
 # ── 2. Clone kernel source ────────────────────────────────────────────────────
 echo ">>> [2/6] Cloning WSL2 kernel source..."
-git clone -b "linux-msft-wsl-6.6.y" --single-branch --depth=1 https://github.com/microsoft/WSL2-Linux-Kernel.git kernel
+git clone -b "linux-msft-wsl-6.18.y" --single-branch --depth=1 https://github.com/microsoft/WSL2-Linux-Kernel.git kernel
 
 KERNEL_VERSION=$(make -C kernel kernelversion 2>/dev/null)
 echo "$KERNEL_VERSION" > kernel-version.txt
@@ -27,13 +27,13 @@ echo "    Kernel version: $KERNEL_VERSION"
 echo ">>> [3/6] Downloading CachyOS patches..."
 mkdir -p patches
 
-curl -fsSL https://raw.githubusercontent.com/CachyOS/kernel-patches/refs/heads/master/6.6/all/0001-cachyos-base-all.patch \
+curl -fsSL https://raw.githubusercontent.com/CachyOS/kernel-patches/refs/heads/master/6.18/all/0001-cachyos-base-all.patch \
   -o patches/0001-cachyos-base-all.patch
 
-curl -fsSL https://raw.githubusercontent.com/CachyOS/kernel-patches/refs/heads/master/6.6/misc/0001-clang-polly.patch \
+curl -fsSL https://raw.githubusercontent.com/CachyOS/kernel-patches/refs/heads/master/6.18/misc/0001-clang-polly.patch \
   -o patches/0002-clang-polly.patch
 
-curl -fsSL https://raw.githubusercontent.com/CachyOS/kernel-patches/refs/heads/master/6.6/sched/0001-bore-cachy.patch \
+curl -fsSL https://raw.githubusercontent.com/CachyOS/kernel-patches/refs/heads/master/6.18/sched/0001-bore-cachy.patch \
   -o patches/0003-bore-cachy.patch
 
 # ── 4. Apply patches ──────────────────────────────────────────────────────────
